@@ -13,8 +13,7 @@ import {
   supabaseConfig,
   loggingConfig,
   emailConfig,
-  awsConfig,
-  stripeConfig,
+  mpesaConfig,
   redisConfig,
 } from './config/configuration';
 import { ProductsModule } from './modules/products/products.module';
@@ -22,6 +21,8 @@ import { ProfilesModule } from './modules/profiles/profiles.module';
 import { RepairShopsModule } from './modules/repair-shops/repair-shops.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { TutorialsModule } from './modules/tutorials/tutorials.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { MpesaModule } from './modules/mpesa/mpesa.module';
 import { AuthGuard } from './guards/auth.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { LoggingInterceptor } from './utils/interceptors/logging.interceptor';
@@ -40,8 +41,7 @@ import { HttpExceptionFilter } from './utils/exceptions/http-exception.filter';
         supabaseConfig,
         loggingConfig,
         emailConfig,
-        awsConfig,
-        stripeConfig,
+        mpesaConfig,
         redisConfig,
       ],
     }),
@@ -64,6 +64,8 @@ import { HttpExceptionFilter } from './utils/exceptions/http-exception.filter';
     RepairShopsModule,
     TransactionsModule,
     TutorialsModule,
+    StorageModule,
+    MpesaModule,
   ],
   providers: [
     {

@@ -30,12 +30,6 @@ const requiredEnvVars = [
 ];
 
 const optionalEnvVars = [
-  // AWS S3
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
-  'AWS_REGION',
-  'AWS_BUCKET_NAME',
-
   // Stripe
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
@@ -104,7 +98,6 @@ function checkEnvFile(envPath: string) {
 
   // Check for service-specific configurations
   const serviceConfigs = {
-    'AWS S3': ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION', 'AWS_BUCKET_NAME'],
     'Stripe': ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
     'Sentry': ['SENTRY_DSN'],
   };

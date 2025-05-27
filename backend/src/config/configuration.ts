@@ -17,15 +17,13 @@ export const configValidationSchema = Joi.object({
   CORS_ORIGINS: Joi.string().required(),
   RATE_LIMIT_MAX: Joi.number().default(100),
   
-  // Stripe
-  STRIPE_SECRET_KEY: Joi.string().required(),
-  STRIPE_WEBHOOK_SECRET: Joi.string().required(),
-  
-  // AWS (for file uploads)
-  AWS_ACCESS_KEY_ID: Joi.string().required(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().required(),
-  AWS_REGION: Joi.string().required(),
-  AWS_BUCKET_NAME: Joi.string().required(),
+  // M-Pesa
+  MPESA_CONSUMER_KEY: Joi.string().required(),
+  MPESA_CONSUMER_SECRET: Joi.string().required(),
+  MPESA_PASSKEY: Joi.string().required(),
+  MPESA_SHORTCODE: Joi.string().required(),
+  MPESA_ENVIRONMENT: Joi.string().valid('sandbox', 'production').default('sandbox'),
+  MPESA_CALLBACK_URL: Joi.string().uri().required(),
   
   // Redis (for caching)
   REDIS_URL: Joi.string().required(),
@@ -84,16 +82,13 @@ export const emailConfig = () => ({
   from: process.env.EMAIL_FROM,
 });
 
-export const awsConfig = () => ({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-  bucketName: process.env.AWS_BUCKET_NAME,
-});
-
-export const stripeConfig = () => ({
-  secretKey: process.env.STRIPE_SECRET_KEY,
-  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+export const mpesaConfig = () => ({
+  consumerKey: process.env.MPESA_CONSUMER_KEY,
+  consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+  passkey: process.env.MPESA_PASSKEY,
+  shortcode: process.env.MPESA_SHORTCODE,
+  environment: process.env.MPESA_ENVIRONMENT || 'sandbox',
+  callbackUrl: process.env.MPESA_CALLBACK_URL,
 });
 
 export const redisConfig = () => ({

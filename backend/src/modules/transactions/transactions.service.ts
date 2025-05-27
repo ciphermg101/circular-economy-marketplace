@@ -8,24 +8,18 @@ import {
   ProcessPaymentDto,
   TransactionStatus 
 } from '../../dtos/transaction.dto';
-import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
 import { logger } from '../../utils/logger';
 import { createClient } from '@supabase/supabase-js';
-import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { MpesaService } from '../../services/mpesa.service';
 
 @Injectable()
 export class TransactionsService {
-  private stripe: Stripe;
-
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly configService: ConfigService
-  ) {
-    this.stripe = new Stripe(this.configService.get('stripeConfig.secretKey')!, {
-      apiVersion: '2023-10-16'
-    });
-  }
+    private readonly configService: ConfigService,
+    private readonly mpesaService: MpesaService
+  ) {}
 
   private get supabase() {
     const url = this.configService.get('supabaseConfig.url');
@@ -51,16 +45,6 @@ export class TransactionsService {
         throw new NotFoundException('Product not found');
       }
 
-      // Create Stripe payment intent
-      const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: Math.round(product.price * 100), // Convert to cents
-        currency: 'usd',
-        metadata: {
-          productId: product.id,
-          userId: buyerId,
-        },
-      });
-
       // Create transaction record
       const { data: transaction, error } = await this.supabase
         .from('transactions')
@@ -72,16 +56,12 @@ export class TransactionsService {
           shipping_address: dto.shippingAddress,
           notes: dto.notes,
           status: TransactionStatus.PENDING,
-          payment_intent_id: paymentIntent.id,
         })
         .select()
         .single();
 
       if (error) throw error;
-      return {
-        transaction,
-        clientSecret: paymentIntent.client_secret,
-      };
+      return transaction;
     } catch (error) {
       logger.error('Error creating transaction:', error);
       throw error;
@@ -106,37 +86,28 @@ export class TransactionsService {
         throw new BadRequestException('Transaction is not in pending state');
       }
 
-      // Create or confirm payment intent
-      let paymentIntent;
-      if (dto.paymentIntentId) {
-        paymentIntent = await this.stripe.paymentIntents.confirm(dto.paymentIntentId);
-      } else {
-        paymentIntent = await this.stripe.paymentIntents.create({
-          amount: Math.round(transaction.amount * 100), // Convert to cents
-          currency: 'usd',
-          payment_method: dto.paymentMethodId,
-          confirmation_method: 'manual',
-          confirm: true
-        });
-      }
+      // Initiate M-Pesa STK Push
+      const stkPushResponse = await this.mpesaService.initiateSTKPush({
+        phoneNumber: dto.phoneNumber,
+        amount: transaction.amount,
+        accountReference: transactionId,
+        transactionDesc: `Payment for order #${transactionId}`,
+      });
 
-      // Update transaction status based on payment intent status
-      const status = paymentIntent.status === 'succeeded' 
-        ? TransactionStatus.PAYMENT_COMPLETED 
-        : TransactionStatus.PAYMENT_INITIATED;
-
+      // Update transaction with M-Pesa checkout request ID
       const { data, error } = await this.supabase
         .from('transactions')
         .update({
-          status,
-          payment_intent_id: paymentIntent.id
+          status: TransactionStatus.PAYMENT_INITIATED,
+          payment_provider: 'mpesa',
+          payment_request_id: stkPushResponse.CheckoutRequestID,
         })
         .eq('id', transactionId)
         .select()
         .single();
 
       if (error) throw error;
-      return { transaction: data, paymentIntent };
+      return { transaction: data, stkPushResponse };
     } catch (error) {
       logger.error('Error processing payment:', error);
       throw error;
@@ -238,47 +209,11 @@ export class TransactionsService {
         throw new NotFoundException('Dispute not found');
       }
 
-      // Get transaction payment intent
-      const { data: transaction } = await this.supabase
+      // Update transaction status
+      await this.supabase
         .from('transactions')
-        .select('payment_intent_id, amount')
-        .eq('id', dispute.transaction_id)
-        .single();
-
-      // Process refund if needed
-      if (dto.refundAmount > 0) {
-        // Validate refund amount
-        if (dto.refundAmount > transaction.amount) {
-          throw new BadRequestException('Refund amount cannot exceed the original transaction amount');
-        }
-
-        try {
-          const refund = await this.stripe.refunds.create({
-            payment_intent: transaction.payment_intent_id,
-            amount: Math.round(dto.refundAmount * 100), // Convert to cents
-            reason: 'requested_by_customer'
-          });
-
-          // Update transaction status and store refund info
-          await this.supabase
-            .from('transactions')
-            .update({ 
-              status: dto.finalStatus,
-              refund_id: refund.id,
-              refunded_amount: dto.refundAmount
-            })
-            .eq('id', dispute.transaction_id);
-        } catch (stripeError) {
-          logger.error('Error processing refund:', stripeError);
-          throw new BadRequestException('Failed to process refund');
-        }
-      } else {
-        // Just update transaction status if no refund
-        await this.supabase
-          .from('transactions')
-          .update({ status: dto.finalStatus })
-          .eq('id', dispute.transaction_id);
-      }
+        .update({ status: dto.finalStatus })
+        .eq('id', dispute.transaction_id);
 
       return { message: 'Dispute resolved successfully' };
     } catch (error) {
@@ -362,36 +297,38 @@ export class TransactionsService {
     }
   }
 
-  async refundTransaction(userId: string, transactionId: string, dto: RefundTransactionDto) {
-    const transaction = await this.getTransaction(userId, transactionId);
-    if (!transaction) {
-      throw new Error('Transaction not found');
-    }
+  // Handle M-Pesa callback
+  async handleMpesaCallback(callbackData: any) {
+    try {
+      const result = await this.mpesaService.handleCallback(callbackData);
+      
+      if (result.success) {
+        // Update transaction status
+        await this.supabase
+          .from('transactions')
+          .update({
+            status: TransactionStatus.PAYMENT_COMPLETED,
+            payment_id: result.transactionId,
+            payment_date: result.date,
+          })
+          .eq('id', result.accountReference);
 
-    if (dto.refundAmount > 0) {
-      // Validate refund amount
-      if (dto.refundAmount > transaction.amount) {
-        throw new Error('Refund amount cannot be greater than transaction amount');
+        return { success: true, message: 'Payment completed successfully' };
       }
 
-      // Process refund through Stripe
-      await this.stripe.refunds.create({
-        payment_intent: transaction.payment_intent_id,
-        amount: Math.round(dto.refundAmount * 100), // Convert to cents
-        reason: dto.reason || 'requested_by_customer',
-      });
+      // Payment failed
+      await this.supabase
+        .from('transactions')
+        .update({
+          status: TransactionStatus.PAYMENT_FAILED,
+          payment_error: result.resultDesc,
+        })
+        .eq('id', result.accountReference);
+
+      return { success: false, message: result.resultDesc };
+    } catch (error) {
+      logger.error('Error handling M-Pesa callback:', error);
+      throw error;
     }
-
-    // Update transaction status
-    const { error } = await this.supabase
-      .from('transactions')
-      .update({ status: 'refunded' })
-      .eq('id', transactionId);
-
-    if (error) {
-      throw new Error(`Error updating transaction: ${error.message}`);
-    }
-
-    return this.getTransaction(userId, transactionId);
   }
 } 

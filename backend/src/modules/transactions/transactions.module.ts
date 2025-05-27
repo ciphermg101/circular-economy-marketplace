@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { TransactionsController } from './transactions.controller';
-import { TransactionsService } from './transactions.service';
-import { SupabaseConfig } from '../../config/supabase.config';
 import { ConfigModule } from '@nestjs/config';
+import { TransactionsService } from './transactions.service';
+import { TransactionsController } from './transactions.controller';
+import { MpesaModule } from '../mpesa/mpesa.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, MpesaModule],
   controllers: [TransactionsController],
-  providers: [TransactionsService, SupabaseConfig],
+  providers: [TransactionsService],
   exports: [TransactionsService],
 })
 export class TransactionsModule {} 

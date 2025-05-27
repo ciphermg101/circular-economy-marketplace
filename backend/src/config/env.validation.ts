@@ -52,23 +52,6 @@ class EnvironmentVariables {
   @IsString()
   REDIS_URL: string;
 
-  // AWS S3
-  @IsString()
-  @IsOptional()
-  AWS_ACCESS_KEY_ID: string;
-
-  @IsString()
-  @IsOptional()
-  AWS_SECRET_ACCESS_KEY: string;
-
-  @IsString()
-  @IsOptional()
-  AWS_REGION: string;
-
-  @IsString()
-  @IsOptional()
-  AWS_BUCKET_NAME: string;
-
   // Stripe
   @IsString()
   @IsOptional()
