@@ -1,0 +1,53 @@
+{
+  "name": "circular-economy-marketplace-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "env:check": "ts-node scripts/check-env.ts",
+    "env:copy": "cp .env.example .env.local",
+    "env:validate": "ts-node scripts/validate-env.ts",
+    "predev": "npm run env:validate",
+    "prebuild": "npm run env:validate"
+  },
+  "dependencies": {
+    "@auth/supabase-adapter": "^0.1.12",
+    "@headlessui/react": "^1.7.18",
+    "@heroicons/react": "^2.1.1",
+    "@sentry/nextjs": "^7.101.1",
+    "@supabase/supabase-js": "^2.39.7",
+    "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/forms": "^0.5.7",
+    "axios": "^1.6.7",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.3.1",
+    "next": "14.1.0",
+    "next-auth": "^4.24.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.50.1",
+    "react-hot-toast": "^2.4.1",
+    "swr": "^2.2.5",
+    "tailwind-merge": "^2.2.1",
+    "web-vitals": "^3.5.2",
+    "zod": "^3.22.4",
+    "zustand": "^4.5.1"
+  },
+  "devDependencies": {
+    "@sentry/webpack-plugin": "^2.14.3",
+    "@types/node": "^20.11.20",
+    "@types/react": "^18.2.58",
+    "@types/react-dom": "^18.2.19",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.1.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "dotenv": "^16.4.5",
+    "ts-node": "^10.9.2"
+  }
+}
