@@ -9,18 +9,20 @@ import {
   Query,
   Request,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '../../dtos/product.dto';
 import { PaginationParams } from '../../types/pagination.types';
-import { AuthenticatedRequest } from '../../types/request';
+import { AuthenticatedRequest } from '../../types/request.types';
 import { RolesGuard } from '../../guards/roles.guard';
-import { Roles } from '../../guards/roles.guard';
+import { Roles } from '../../decorators/roles.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AuthGuard } from '../../guards/auth.guard';
 
 @ApiTags('products')
 @Controller('products')
-@UseGuards(RolesGuard)
+@UseGuards(AuthGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
@@ -28,46 +30,49 @@ export class ProductsController {
   @Roles('seller')
   @ApiOperation({ summary: 'Create a new product' })
   @ApiBearerAuth()
-  async createProduct(
-    @Request() req: AuthenticatedRequest,
-    @Body() dto: CreateProductDto,
-  ) {
-    return this.productsService.createProduct(req.user.id, dto);
+  async create(@Request() req: AuthenticatedRequest, @Body() dto: CreateProductDto) {
+    return this.productsService.create(req.user.id, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Search products' })
-  async getAllProducts(@Query() pagination: PaginationParams) {
-    return this.productsService.getAllProducts(pagination);
+  async findAll(@Query() pagination: PaginationParams) {
+    return this.productsService.search(pagination);
   }
 
-  @Put(':id')
+  @Get('nearby')
+  async findNearby(
+    @Query('latitude') latitude: number,
+    @Query('longitude') longitude: number,
+    @Query('radius') radius: number = 10,
+  ) {
+    return this.productsService.findNearby(latitude, longitude, radius);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a product by ID' })
+  async findOne(@Param('id') id: string) {
+    return this.productsService.findOne(id);
+  }
+
+  @Patch(':id')
   @Roles('seller')
   @ApiOperation({ summary: 'Update a product' })
   @ApiBearerAuth()
-  async updateProduct(
+  async update(
     @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.productsService.updateProduct(req.user.id, id, dto);
+    return this.productsService.update(req.user.id, id, dto);
   }
 
   @Delete(':id')
   @Roles('seller')
   @ApiOperation({ summary: 'Delete a product' })
   @ApiBearerAuth()
-  async deleteProduct(
-    @Request() req: AuthenticatedRequest,
-    @Param('id') id: string,
-  ) {
-    return this.productsService.deleteProduct(req.user.id, id);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a product by ID' })
-  async getProduct(@Param('id') id: string) {
-    return this.productsService.getProduct(id);
+  async remove(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.productsService.remove(req.user.id, id);
   }
 
   @Get('seller/:id')

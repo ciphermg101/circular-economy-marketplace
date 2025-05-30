@@ -1,124 +1,240 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
-import { logger } from '../utils/logger';
+import { Redis } from 'ioredis';
+import CircuitBreaker from 'opossum';
+import { MetricsService } from './metrics.service';
+
+// Runtime enum-like object for ErrorCategory values
+const ErrorCategoryEnum = {
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
+  BUSINESS_LOGIC_ERROR: 'BUSINESS_LOGIC_ERROR',
+  CIRCUIT_BREAKER: 'CIRCUIT_BREAKER',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+} as const;
 
 @Injectable()
 export class CacheService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CacheService.name);
   private redis: Redis;
   private readonly defaultTTL = 3600; // 1 hour in seconds
+  private readonly cacheName = 'redis';
+  private readonly lockTTL = 5; // 5 seconds
+  private circuitBreaker: CircuitBreaker;
 
-  constructor(private configService: ConfigService) {
-    this.redis = new Redis(this.configService.get('redisConfig.url')!);
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService,
+  ) {
+    const redisUrl = this.configService.get<string>('redis.url');
+    if (!redisUrl) {
+      throw new Error('Redis URL not configured');
+    }
 
-    // Handle Redis errors
-    this.redis.on('error', (error) => {
-      logger.error('Redis connection error:', error);
+    this.redis = new Redis(redisUrl, {
+      retryStrategy: (times) => Math.min(times * 50, 2000),
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      reconnectOnError: (err) => err.message.includes('READONLY'),
+      enableOfflineQueue: false,
     });
 
-    this.redis.on('connect', () => {
-      logger.info('Successfully connected to Redis');
+    this.circuitBreaker = new CircuitBreaker(
+      async (command: () => Promise<any>) => command(),
+      {
+        timeout: 3000,
+        errorThresholdPercentage: 50,
+        resetTimeout: 30000,
+      },
+    );
+
+    this.setupCircuitBreakerEvents();
+    this.setupRedisEventHandlers();
+  }
+
+  private setupCircuitBreakerEvents(): void {
+    this.circuitBreaker.on('open', () => {
+      this.logger.warn('Circuit breaker opened');
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.CIRCUIT_BREAKER,
+        severity: 'high',
+        context: 'redis',
+        path: 'circuit-breaker-open',
+      });
+    });
+
+    this.circuitBreaker.on('halfOpen', () => {
+      this.logger.log('Circuit breaker half-open');
+    });
+
+    this.circuitBreaker.on('close', () => {
+      this.logger.log('Circuit breaker closed');
     });
   }
 
-  async onModuleInit() {
+  private async executeWithCircuitBreaker<T>(command: () => Promise<T>): Promise<T> {
     try {
-      await this.redis.ping();
-      logger.info('Redis cache service initialized');
+      const result = await this.circuitBreaker.fire(command);
+      return result as T;
     } catch (error) {
-      logger.error('Failed to initialize Redis cache service:', error);
+      this.logger.error('Circuit breaker rejected command', error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.CIRCUIT_BREAKER,
+        severity: 'high',
+        context: 'redis',
+        path: 'circuit-breaker-command-reject',
+      });
+      throw error;
+    }
+  }  
+
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.executeWithCircuitBreaker(() => this.redis.ping());
+      this.logger.log('Redis cache service initialized');
+    } catch (error) {
+      this.logger.error('Failed to initialize Redis cache service:', error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'critical',
+        context: 'cache',
+        path: 'onModuleInit',
+      });
       throw error;
     }
   }
 
-  async onModuleDestroy() {
-    await this.redis.quit();
-    logger.info('Redis connection closed');
+  async onModuleDestroy(): Promise<void> {
+    try {
+      await this.redis.quit();
+      this.logger.log('Redis connection closed');
+    } catch (error) {
+      this.logger.error('Error closing Redis connection:', error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'medium',
+        context: 'cache',
+        path: 'onModuleDestroy',
+      });
+    }
   }
 
   async get<T>(key: string): Promise<T | null> {
-    const value = await this.redis.get(key);
-    if (!value) return null;
-    return JSON.parse(value);
-  }
-
-  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-    const serializedValue = JSON.stringify(value);
-    if (ttl) {
-      await this.redis.set(key, serializedValue, 'EX', ttl);
-    } else {
-      await this.redis.set(key, serializedValue);
-    }
-  }
-
-  async del(key: string): Promise<void> {
-    await this.redis.del(key);
-  }
-
-  async exists(key: string): Promise<boolean> {
-    const exists = await this.redis.exists(key);
-    return exists === 1;
-  }
-
-  async acquireLock(lockKey: string, ttl: number): Promise<boolean> {
-    const locked = await this.redis.set(lockKey, '1', 'EX', ttl, 'NX');
-    return locked === 'OK';
-  }
-
-  async releaseLock(lockKey: string): Promise<void> {
-    await this.redis.del(lockKey);
-  }
-
-  async clearCache(): Promise<void> {
-    await this.redis.flushdb();
-  }
-
-  async clearPattern(pattern: string): Promise<void> {
+    const startTime = process.hrtime();
     try {
-      const keys = await this.redis.keys(pattern);
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-      }
-    } catch (error) {
-      logger.error(`Error clearing cache pattern ${pattern}:`, error);
-    }
-  }
+      const value = await this.executeWithCircuitBreaker(() => this.redis.get(key));
+      this.logDuration('get', startTime);
 
-  async increment(key: string, value: number = 1): Promise<number> {
-    try {
-      return await this.redis.incrby(key, value);
-    } catch (error) {
-      logger.error(`Error incrementing cache key ${key}:`, error);
-      return 0;
-    }
-  }
-
-  async decrement(key: string, value: number = 1): Promise<number> {
-    try {
-      return await this.redis.decrby(key, value);
-    } catch (error) {
-      logger.error(`Error decrementing cache key ${key}:`, error);
-      return 0;
-    }
-  }
-
-  async getOrSet<T>(
-    key: string,
-    callback: () => Promise<T>,
-    ttl: number = this.defaultTTL
-  ): Promise<T> {
-    try {
-      const cachedValue = await this.get<T>(key);
-      if (cachedValue !== null) {
-        return cachedValue;
+      if (value) {
+        this.metricsService.recordCacheOperation('hit', this.cacheName);
+        return JSON.parse(value) as T;
       }
 
-      const freshValue = await callback();
-      await this.set(key, freshValue, ttl);
-      return freshValue;
+      this.metricsService.recordCacheOperation('miss', this.cacheName);
+      return null;
     } catch (error) {
-      logger.error(`Error in getOrSet for key ${key}:`, error);
-      throw error;
+      this.logger.error(`Error getting cache key ${key}:`, error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'medium',
+        context: 'cache',
+        path: `get:${key}`,
+      });
+      return null as T | null;
     }
   }
-} 
+
+  async set<T>(key: string, value: T, ttl: number = this.defaultTTL): Promise<void> {
+    const startTime = process.hrtime();
+    try {
+      await this.executeWithCircuitBreaker(() =>
+        this.redis.set(key, JSON.stringify(value), 'EX', ttl),
+      );
+      this.logDuration('set', startTime);
+      this.metricsService.recordCacheOperation(
+        'set',
+        this.cacheName,
+        this.getDurationInSeconds(startTime),
+      );
+    } catch (error) {
+      this.logger.error(`Error setting cache key ${key}:`, error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'medium',
+        context: 'cache',
+        path: `set:${key}`,
+      });
+    }
+  }
+
+  async del(key: string): Promise<number> {
+    const startTime = process.hrtime();
+    try {
+      const result = await this.executeWithCircuitBreaker(() => this.redis.del(key));
+      this.logDuration('del', startTime);
+      this.metricsService.recordCacheOperation(
+        'del',
+        this.cacheName,
+        this.getDurationInSeconds(startTime),
+      );
+      return result; // Number of keys removed
+    } catch (error) {
+      this.logger.error(`Error deleting cache key ${key}:`, error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'medium',
+        context: 'cache',
+        path: `del:${key}`,
+      });
+      return 0;
+    }
+  }  
+
+  private logDuration(operation: string, startTime: [number, number]): void {
+    const duration = this.getDurationInSeconds(startTime);
+    this.logger.debug(`Cache operation ${operation} took ${duration.toFixed(3)} seconds`);
+  }
+
+  private getDurationInSeconds(startTime: [number, number]): number {
+    const diff = process.hrtime(startTime);
+    return diff[0] + diff[1] / 1e9;
+  }
+
+  private setupRedisEventHandlers(): void {
+    this.redis.on('error', (error) => {
+      this.logger.error('Redis error:', error);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'high',
+        context: 'redis',
+        path: 'redis-error',
+      });
+    });
+
+    this.redis.on('connect', () => {
+      this.logger.log('Redis connected');
+    });
+
+    this.redis.on('close', () => {
+      this.logger.log('Redis connection closed');
+    });
+
+    this.redis.on('reconnecting', (delay: number) => {
+      this.logger.warn(`Redis reconnecting in ${delay}ms`);
+      this.metricsService.recordError({
+        type: ErrorCategoryEnum.DATABASE_ERROR,
+        severity: 'medium',
+        context: 'redis',
+        path: 'redis-reconnecting',
+      });
+    });
+  }
+}

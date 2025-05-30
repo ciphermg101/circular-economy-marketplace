@@ -2,7 +2,7 @@ import { ReactNode } from 'react'
 import { AuthProvider } from './AuthContext'
 import { CartProvider } from './CartContext'
 import { ThemeProvider } from './ThemeContext'
-import { ToastProvider } from './ToastContext'
+import { ToastProvider } from './ToastProvider'
 
 interface ProvidersProps {
   children: ReactNode

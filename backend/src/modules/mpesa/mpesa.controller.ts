@@ -8,27 +8,33 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '../../guards/auth.guard';
-import { MpesaService, STKPushRequest } from '../../services/mpesa.service';
+import { MpesaService } from './mpesa.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('mpesa')
 @Controller('mpesa')
+@UseGuards(AuthGuard)
 export class MpesaController {
   constructor(private readonly mpesaService: MpesaService) {}
 
-  @Post('stk-push')
-  @UseGuards(AuthGuard)
+  @Post('initiate')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initiate STK push payment' })
-  async initiateSTKPush(@Body() data: STKPushRequest) {
-    if (!data.phoneNumber.startsWith('254')) {
-      throw new BadRequestException('Phone number must start with 254');
+  async initiatePayment(
+    @Body() data: {
+      phoneNumber: string;
+      amount: number;
+      accountReference: string;
     }
-    return this.mpesaService.initiateSTKPush(data);
+  ) {
+    return this.mpesaService.initiatePayment(
+      data.phoneNumber,
+      data.amount,
+      data.accountReference
+    );
   }
 
   @Get('status/:checkoutRequestId')
-  @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Query transaction status' })
   async queryTransactionStatus(@Param('checkoutRequestId') checkoutRequestId: string) {
@@ -37,7 +43,7 @@ export class MpesaController {
 
   @Post('callback')
   @ApiOperation({ summary: 'M-Pesa callback endpoint' })
-  async handleCallback(@Body() callbackData: any) {
-    return this.mpesaService.handleCallback(callbackData);
+  async handleCallback(@Body() data: any) {
+    return this.mpesaService.handleCallback(data);
   }
 } 

@@ -1,168 +1,149 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/node';
-import { ProfilingIntegration } from '@sentry/profiling-node';
-import { Span, SpanContext } from '@sentry/types';
 import { MetricsService } from './metrics.service';
-
-interface ErrorContext {
-  [key: string]: any;
-}
+import { logger } from '../utils/logger';
 
 interface TransactionContext {
   name: string;
-  op: string;
+  op?: string;
   description?: string;
   tags?: Record<string, string>;
 }
 
 @Injectable()
-export class MonitoringService implements OnModuleInit {
-  private readonly logger = new Logger(MonitoringService.name);
+export class MonitoringService {
   private readonly isDevelopment: boolean;
+  private readonly errorTrends = new Map<string, { count: number; occurrences: any[] }>();
+  private readonly logger: ReturnType<typeof logger>;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly metricsService: MetricsService,
+    private readonly metricsService: MetricsService
   ) {
-    this.isDevelopment = configService.get('NODE_ENV') === 'development';
-  }
-
-  onModuleInit() {
+    this.logger = logger(this.configService);
+    this.isDevelopment = this.configService.get('monitoring.environment') === 'development';
     this.initializeSentry();
   }
 
   private initializeSentry() {
-    const sentryDsn = this.configService.get('monitoringConfig.sentryDsn');
-    const environment = this.configService.get('monitoringConfig.environment');
+    const dsn = this.configService.get('monitoring.sentryDsn');
+    if (!dsn) {
+      this.logger.warn('Sentry DSN not provided, error tracking will be limited');
+      return;
+    }
 
-    if (sentryDsn) {
-      Sentry.init({
-        dsn: sentryDsn,
-        environment,
-        tracesSampleRate: 1.0,
-      });
+    Sentry.init({
+      dsn,
+      environment: this.configService.get('monitoring.environment'),
+      tracesSampleRate: this.isDevelopment ? 1.0 : 0.1,
+    });
+  }
+
+  trackError(error: Error, context: { module: string }) {
+    this.logger.error(`Error occurred in module ${context.module}: ${error.message}`, error.stack, context.module); // Pass context.module as a string
+
+    this.metricsService.incrementErrorCount(error.name, context.module || 'unknown');
+    this.updateErrorTrends(error, context);
+  }
+
+  private updateErrorTrends(error: Error, context: { module: string }) {
+    const key = `${error.name}:${context.module}`;
+    const now = new Date();
+
+    const analytics = {
+      timestamp: now,
+      error,
+      module: context.module,
+      message: error.message,
+      stack: error.stack,
+    };
+
+    const existing = this.errorTrends.get(key) || { count: 0, occurrences: [] };
+    existing.count++;
+    existing.occurrences.push(analytics);
+    this.errorTrends.set(key, existing);
+  }
+
+  getErrorTrends(): Map<string, { count: number; occurrences: any[] }> {
+    return this.errorTrends;
+  }
+
+  getRecentErrors(limit: number = 10): any[] {
+    const allErrors: any[] = [];
+    for (const trends of this.errorTrends.values()) {
+      allErrors.push(...trends.occurrences);
+    }
+    return allErrors.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
+  }
+
+  captureException(error: Error, context?: Record<string, any>) {
+    this.logger.error(`Error captured: ${error.message}`, error.stack, context ? JSON.stringify(context) : undefined); // Convert context to string if necessary
+    if (!this.isDevelopment) {
+      Sentry.captureException(error);
     }
   }
 
   captureError(error: Error, context?: Record<string, any>) {
-    Sentry.captureException(error, {
-      extra: context,
+    this.captureException(error, context);
+    this.metricsService.recordError({
+      type: 'UNKNOWN_ERROR',
+      severity: 'medium',
+      context: context?.module || 'unknown',
+      path: context?.path || 'unknown'
     });
   }
 
-  captureMessage(message: string, context?: Record<string, any>) {
-    Sentry.captureMessage(message, {
-      extra: context,
-    });
-  }
-
-  startTransaction(name: string) {
-    return Sentry.startTransaction({
-      name,
-      op: 'transaction',
-    });
-  }
-
-  setUser(user: { id: string; email?: string }) {
-    Sentry.setUser(user);
-  }
-
-  clearUser() {
-    Sentry.setUser(null);
-  }
-
-  setTag(key: string, value: string) {
-    Sentry.setTag(key, value);
-  }
-
-  setExtra(key: string, value: any) {
-    Sentry.setExtra(key, value);
-  }
-
-  captureException(error: Error, context?: ErrorContext) {
-    this.logger.error(error.message, {
-      error,
-      context,
-    });
-
-    if (!this.isDevelopment) {
-      Sentry.withScope(scope => {
-        if (context) {
-          Object.entries(context).forEach(([key, value]) => {
-            scope.setExtra(key, MonitoringService.sanitizeData(value));
-          });
-        }
-        Sentry.captureException(error);
-      });
-    }
-  }
-
-  finishTransaction(span: Span) {
-    span.finish();
-    this.logger.debug(`Transaction ${span.op} took ${span.endTimestamp! - span.startTimestamp}ms`);
-  }
-
-  startSpan(name: string, operation: string) {
-    return Sentry.startTransaction({
-      name,
-      op: operation,
-    });
-  }
-
-  async withTransaction<T>(
-    context: TransactionContext,
-    callback: (span: Span) => Promise<T>
-  ): Promise<T> {
-    const transaction = this.startTransaction(context.name);
-
+  captureEvent(eventName: string, metadata: Record<string, any> = {}) {
     try {
-      const result = await callback(transaction);
-      return result;
+      this.logger.debug(`Event captured: ${eventName}`); // Update logging method
+      
+      // Track event metrics
+      this.metricsService.increment('event_' + eventName + '_total', metadata); // Ensure increment method exists
+
+      // Send to Sentry if in production
+      if (!this.isDevelopment) {
+        Sentry.captureEvent({
+          message: eventName,
+          level: 'info',
+          extra: metadata,
+        });
+      }
     } catch (error) {
-      this.captureException(error, { transactionName: context.name });
-      throw error;
-    } finally {
-      this.finishTransaction(transaction);
+      this.logger.error(`Failed to capture event ${eventName}:`, error); // Update logging method
     }
   }
 
-  private static sanitizeData(data: any): any {
-    if (!data) return data;
-
-    const sanitized = { ...data };
-    const sensitiveFields = [
-      'password',
-      'token',
-      'secret',
-      'key',
-      'authorization',
-      'creditCard',
-    ];
-
-    const sanitizeObject = (obj: any) => {
-      Object.keys(obj).forEach(key => {
-        if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-          obj[key] = '[REDACTED]';
-        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-          sanitizeObject(obj[key]);
-        }
-      });
-    };
-
-    sanitizeObject(sanitized);
-    return sanitized;
-  }
-
-  private handleError(error: Error) {
-    // Log the error
-    this.logger.error(error.message, error.stack);
-
-    // Capture error in Sentry
-    Sentry.captureException(error);
-  }
-
-  private measureTransactionDuration(name: string, duration: number) {
-    this.logger.debug(`Transaction ${name} took ${duration}ms`);
-  }
-} 
+  trackErrorAnalytics(analytics: {
+    errorId: string;
+    error: Error;
+    type: string;
+    severity: string;
+    module: string;
+    timestamp: string;
+    userId?: string;
+    requestId?: string;
+    path: string;
+    context: Record<string, any>;
+  }) {
+    // Format all relevant metadata into the message string
+    const message = `Analytics - Error [${analytics.severity}] in ${analytics.module} at ${analytics.timestamp} | ID: ${analytics.errorId} | Message: ${analytics.error.message} | Path: ${analytics.path} | User: ${analytics.userId || 'N/A'} | Request: ${analytics.requestId || 'N/A'} | Context: ${JSON.stringify(analytics.context)}`;
+  
+    this.logger.error(
+      message,
+      analytics.error.stack,
+      analytics.module // this is the `context` string
+    );
+  
+    this.captureException(analytics.error, {
+      module: analytics.module,
+      errorId: analytics.errorId,
+      path: analytics.path,
+      requestId: analytics.requestId,
+      userId: analytics.userId,
+      context: analytics.context,
+      type: analytics.type,
+      severity: analytics.severity,
+    });
+  }   
+}

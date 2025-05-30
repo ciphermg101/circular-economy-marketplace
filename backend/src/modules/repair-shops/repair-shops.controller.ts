@@ -17,9 +17,11 @@ import { AuthGuard } from '../../guards/auth.guard';
 import { RolesGuard } from '../../guards/roles.guard';
 import { Roles } from '../../decorators/roles.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AuthenticatedRequest } from '../../types/request.types';
 
 @ApiTags('repair-shops')
 @Controller('repair-shops')
+@UseGuards(AuthGuard)
 export class RepairShopsController {
   constructor(private readonly repairShopsService: RepairShopsService) {}
 
@@ -28,8 +30,8 @@ export class RepairShopsController {
   @Roles('repair_shop')
   @ApiOperation({ summary: 'Create a new repair shop' })
   @ApiBearerAuth()
-  async createRepairShop(@Request() req, @Body() dto: CreateRepairShopDto) {
-    return this.repairShopsService.createRepairShop(req.user.id, dto);
+  async createRepairShop(@Request() req: AuthenticatedRequest, @Body() dto: CreateRepairShopDto) {
+    return this.repairShopsService.create(req.user.id, dto);
   }
 
   @Get('my-shop')
@@ -37,14 +39,14 @@ export class RepairShopsController {
   @Roles('repair_shop')
   @ApiOperation({ summary: 'Get current user repair shop' })
   @ApiBearerAuth()
-  async getMyShop(@Request() req) {
-    return this.repairShopsService.getMyShop(req.user.id);
+  async getMyShop(@Request() req: AuthenticatedRequest) {
+    return this.repairShopsService.findByUserId(req.user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a repair shop by ID' })
-  async getRepairShop(@Param('id') id: string) {
-    return this.repairShopsService.getRepairShop(id);
+  async findOne(@Param('id') id: string) {
+    return this.repairShopsService.findOne(id);
   }
 
   @Put(':id')
@@ -53,11 +55,11 @@ export class RepairShopsController {
   @ApiOperation({ summary: 'Update a repair shop' })
   @ApiBearerAuth()
   async updateRepairShop(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: UpdateRepairShopDto,
   ) {
-    return this.repairShopsService.updateRepairShop(req.user.id, id, dto);
+    return this.repairShopsService.update(req.user.id, id, dto);
   }
 
   @Delete(':id')
@@ -65,8 +67,8 @@ export class RepairShopsController {
   @Roles('repair_shop')
   @ApiOperation({ summary: 'Delete a repair shop' })
   @ApiBearerAuth()
-  async deleteRepairShop(@Request() req, @Param('id') id: string) {
-    return this.repairShopsService.deleteRepairShop(req.user.id, id);
+  async deleteRepairShop(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.repairShopsService.remove(req.user.id, id);
   }
 
   @Get()

@@ -1,11 +1,13 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NestMiddleware, UnauthorizedException, LoggerService, Inject } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { SupabaseConfig } from '../config/supabase.config';
-import { logger } from '../utils/logger';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    @Inject('LoggerService') private readonly logger: LoggerService, // Inject the logger
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
@@ -21,16 +23,19 @@ export class AuthMiddleware implements NestMiddleware {
       const { data: { user }, error } = await supabase.auth.getUser(token);
 
       if (error || !user) {
-        logger.error('Authentication error:', { error });
+        this.logger.error('Authentication error', error?.stack, 'AuthMiddleware');
         throw new UnauthorizedException('Invalid token');
       }
 
-      // Attach the user to the request for later use
       req['user'] = user;
       next();
     } catch (error) {
-      logger.error('Authentication middleware error:', error);
+      this.logger.error(
+        'Authentication middleware error',
+        error instanceof Error ? error.stack : undefined,
+        'AuthMiddleware',
+      );
       next(error);
     }
   }
-} 
+}

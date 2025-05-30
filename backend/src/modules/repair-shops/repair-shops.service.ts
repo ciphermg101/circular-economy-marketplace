@@ -1,20 +1,34 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseConfig } from '../../config/supabase.config';
-import { CreateRepairShopDto, UpdateRepairShopDto, SearchRepairShopsDto } from '../../dtos/repair-shop.dto';
-import { PaginationParams } from '../../types/common.types';
-import { logger } from '../../utils/logger';
+import { CreateRepairShopDto, UpdateRepairShopDto, SearchRepairShopsDto, RepairShop } from '../../dtos/repair-shop.dto';
+import { PaginationParams, Point, GeoPoint } from '../../types/common.types';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class RepairShopsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  private supabase;
+  private readonly logger = new Logger(RepairShopsService.name);
 
-  private get supabase() {
-    return this.supabaseConfig.getClient();
+  constructor(private readonly supabaseConfig: SupabaseConfig) {
+    this.supabase = this.supabaseConfig.getClient();
   }
 
-  async createRepairShop(userId: string, dto: CreateRepairShopDto) {
+  private convertPointToGeoPoint(point: Point): GeoPoint {
+    return {
+      type: 'Point',
+      coordinates: [point.longitude, point.latitude],
+    };
+  }
+
+  private convertGeoPointToPoint(geoPoint: GeoPoint): Point {
+    return {
+      latitude: geoPoint.coordinates[1],
+      longitude: geoPoint.coordinates[0],
+    };
+  }
+
+  async create(userId: string, dto: CreateRepairShopDto) {
     try {
-      // Check if user already has a repair shop
       const { data: existingShop } = await this.supabase
         .from('repair_shops')
         .select('id')
@@ -22,7 +36,7 @@ export class RepairShopsService {
         .single();
 
       if (existingShop) {
-        throw new ConflictException('User already has a repair shop');
+        throw new BadRequestException('User already has a repair shop');
       }
 
       const { data, error } = await this.supabase
@@ -30,6 +44,7 @@ export class RepairShopsService {
         .insert({
           user_id: userId,
           ...dto,
+          location: dto.location,
         })
         .select()
         .single();
@@ -37,64 +52,110 @@ export class RepairShopsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error creating repair shop:', error);
-      throw error;
+      this.logger.error('Error creating repair shop:', error);
+      throw new InternalServerErrorException('Failed to create repair shop');
     }
   }
 
-  async getRepairShop(shopId: string) {
+  async findAll() {
     try {
       const { data, error } = await this.supabase
         .from('repair_shops')
-        .select(`
-          *,
-          user:profiles(*)
-        `)
-        .eq('id', shopId)
+        .select('*');
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logger.error('Error finding repair shops:', error);
+      throw new InternalServerErrorException('Failed to find repair shops');
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('repair_shops')
+        .select('*')
+        .eq('id', id)
         .single();
 
       if (error) throw error;
       if (!data) throw new NotFoundException('Repair shop not found');
-
       return data;
     } catch (error) {
-      logger.error('Error getting repair shop:', error);
-      throw error;
+      this.logger.error('Error finding repair shop:', error);
+      throw new InternalServerErrorException('Failed to find repair shop');
     }
   }
 
-  async updateRepairShop(userId: string, shopId: string, dto: UpdateRepairShopDto) {
+  async findByUserId(userId: string) {
     try {
       const { data, error } = await this.supabase
         .from('repair_shops')
-        .update(dto)
-        .eq('id', shopId)
-        .eq('user_id', userId) // Ensure user owns the shop
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new NotFoundException('Repair shop not found');
+      return data;
+    } catch (error) {
+      this.logger.error('Error finding repair shop:', error);
+      throw new InternalServerErrorException('Failed to find repair shop');
+    }
+  }
+
+  async update(userId: string, id: string, dto: UpdateRepairShopDto) {
+    try {
+      const { data: shop } = await this.supabase
+        .from('repair_shops')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!shop) throw new NotFoundException('Repair shop not found');
+      if (shop.user_id !== userId) throw new BadRequestException('Not authorized to update this shop');
+
+      const { data, error } = await this.supabase
+        .from('repair_shops')
+        .update({
+          ...dto,
+          location: dto.location,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      if (!data) throw new NotFoundException('Repair shop not found or unauthorized');
-
       return data;
     } catch (error) {
-      logger.error('Error updating repair shop:', error);
-      throw error;
+      this.logger.error('Error updating repair shop:', error);
+      throw new InternalServerErrorException('Failed to update repair shop');
     }
   }
 
-  async deleteRepairShop(userId: string, shopId: string) {
+  async remove(userId: string, id: string) {
     try {
+      const { data: shop } = await this.supabase
+        .from('repair_shops')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!shop) throw new NotFoundException('Repair shop not found');
+      if (shop.user_id !== userId) throw new BadRequestException('Not authorized to delete this shop');
+
       const { error } = await this.supabase
         .from('repair_shops')
         .delete()
-        .eq('id', shopId)
-        .eq('user_id', userId); // Ensure user owns the shop
+        .eq('id', id);
 
       if (error) throw error;
+      return { message: 'Repair shop deleted successfully' };
     } catch (error) {
-      logger.error('Error deleting repair shop:', error);
-      throw error;
+      this.logger.error('Error deleting repair shop:', error);
+      throw new InternalServerErrorException('Failed to delete repair shop');
     }
   }
 
@@ -122,11 +183,18 @@ export class RepairShopsService {
 
       // Location-based search
       if (searchDto.location && searchDto.radius) {
-        query = query.rpc('nearby_repair_shops', {
-          lat: searchDto.location.latitude,
-          lng: searchDto.location.longitude,
-          radius_km: parseFloat(searchDto.radius),
-        });
+        const geoPoint = this.convertPointToGeoPoint(searchDto.location);
+        const nearbyShops = await this.supabase
+          .rpc('find_nearby_repair_shops', {
+            lat: searchDto.location.latitude,
+            lng: searchDto.location.longitude,
+            radius_km: parseFloat(searchDto.radius)
+          });
+
+        if (nearbyShops.error) throw nearbyShops.error;
+        
+        // Filter the query by the found shop IDs
+        query = query.in('id', nearbyShops.data.map((s: RepairShop) => s.id));
       }
 
       // Apply pagination
@@ -138,12 +206,19 @@ export class RepairShopsService {
         .order(orderBy, { ascending: order === 'asc' })
         .range(start, end);
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      return data;
+
+      return {
+        items: data,
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      };
     } catch (error) {
-      logger.error('Error searching repair shops:', error);
+      this.logger.error('Error searching repair shops:', error);
       throw error;
     }
   }
@@ -167,40 +242,25 @@ export class RepairShopsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error getting shops by service:', error);
+      this.logger.error('Error getting shops by service:', error);
       throw error;
     }
   }
 
-  async getMyShop(userId: string) {
+  async findNearby(latitude: number, longitude: number, radius: number) {
     try {
       const { data, error } = await this.supabase
-        .from('repair_shops')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+        .rpc('find_nearby_repair_shops', {
+          lat: latitude,
+          lng: longitude,
+          radius_km: radius
+        });
 
       if (error) throw error;
-      if (!data) throw new NotFoundException('Repair shop not found');
-
       return data;
     } catch (error) {
-      logger.error('Error getting user repair shop:', error);
-      throw error;
+      this.logger.error('Error finding nearby repair shops:', error);
+      throw new InternalServerErrorException('Failed to find nearby repair shops');
     }
-  }
-
-  async findNearbyShops(latitude: number, longitude: number, radius: number) {
-    const { data, error } = await this.supabase.rpc('find_nearby_repair_shops', {
-      lat: latitude,
-      lng: longitude,
-      radius_km: radius,
-    });
-
-    if (error) {
-      throw new Error(`Error finding nearby repair shops: ${error.message}`);
-    }
-
-    return data;
   }
 } 

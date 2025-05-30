@@ -3,20 +3,23 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { WinstonModule } from 'nest-winston';
-import { getWinstonConfig } from './config/logger.config';
+import { logger } from './utils/logger'; // Import the logger factory function
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
 import helmet from 'helmet';
 import { SecurityMiddleware } from './middleware/security.middleware';
 
 async function bootstrap() {
-  // Create the app with Winston logger
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
 
-  // Configure logger
-  app.useLogger(WinstonModule.createLogger(getWinstonConfig(configService)));
+  const configService = app.get(ConfigService);
+  const appLogger = logger(configService); // Create a logger instance using ConfigService
+
+  // Use the logger for HTTP logging
+  app.useLogger(appLogger); // Set the logger
+
+   // Apply helmet middleware for security
+   app.use(helmet()); 
 
   const port = configService.get('app.port');
   const apiPrefix = configService.get('app.apiPrefix');
@@ -64,8 +67,8 @@ async function bootstrap() {
   // Start the server
   await app.listen(port);
   
-  console.log(`Application is running on: ${await app.getUrl()}`);
-  console.log(`Swagger documentation is available at: ${await app.getUrl()}/docs`);
+  appLogger.info(`Application is running on: ${await app.getUrl()}`);
+  appLogger.info(`Swagger documentation is available at: ${await app.getUrl()}/docs`);
 }
 
 bootstrap();

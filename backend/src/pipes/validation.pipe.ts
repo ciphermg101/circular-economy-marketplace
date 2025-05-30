@@ -3,13 +3,16 @@ import {
   Injectable,
   ArgumentMetadata,
   BadRequestException,
+  Inject,
+  LoggerService,
 } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
-import { logger } from '../utils/logger';
 
 @Injectable()
 export class ValidationPipe implements PipeTransform<any> {
+  constructor(private readonly logger: LoggerService) {}
+
   async transform(value: any, { metatype }: ArgumentMetadata) {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
@@ -19,20 +22,20 @@ export class ValidationPipe implements PipeTransform<any> {
     const errors = await validate(object);
 
     if (errors.length > 0) {
-      const messages = errors.map(error => {
-        return {
-          property: error.property,
-          constraints: error.constraints,
-          value: error.value,
-        };
-      });
-
-      logger.warn('Validation failed', { errors: messages });
+      const messages = errors.map(error => ({
+        property: error.property,
+        constraints: error.constraints,
+        value: error.value,
+      }));
+    
+      // this.logger!.warn('Validation failed', 'ValidationPipe');
+      // this.logger!.debug(messages, 'ValidationPipe');
+    
       throw new BadRequestException({
         message: 'Validation failed',
         errors: messages,
       });
-    }
+    }    
 
     return object;
   }
@@ -41,4 +44,4 @@ export class ValidationPipe implements PipeTransform<any> {
     const types: Function[] = [String, Boolean, Number, Array, Object];
     return !types.includes(metatype);
   }
-} 
+}

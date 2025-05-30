@@ -8,7 +8,7 @@ export class SupabaseConfig {
 
   getClient() {
     const supabaseUrl = this.configService.get<string>('supabase.url');
-    const supabaseKey = this.configService.get<string>('supabase.serviceRoleKey');
+    const supabaseKey = this.configService.get<string>('supabase.key');
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing Supabase configuration');

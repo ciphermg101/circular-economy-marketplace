@@ -1,11 +1,13 @@
+// frontend/src/components/products/EnhancedCategoryNavigation.tsx
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRightIcon, SearchIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, MagnifyingGlassIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { showToast } from '../common/Toast';
+import { useToast } from '../../contexts/ToastProvider';
 import { useWebSocket } from '@/lib/websocket';
 
 interface Category {
@@ -119,26 +121,29 @@ export const EnhancedCategoryNavigation: React.FC = () => {
   const [showFilters, setShowFilters] = React.useState(false);
   const selectedId = router.query.category as string;
 
-  // Initialize WebSocket for real-time category updates
   useWebSocket(undefined);
+  const { showToast } = useToast();
 
-  const { data: categories, isLoading, error } = useQuery({
+  const { data: categories, isLoading, error } = useQuery<Category[], Error>({
     queryKey: ['categories'],
     queryFn: fetchCategories,
-    onError: (error) => {
-      showToast(error.message, 'error');
-    },
   });
-
+  
+  React.useEffect(() => {
+    if (error) {
+      showToast(error.message, 'error');
+    }
+  }, [error, showToast]);
+  
+  const categoriesList = categories ?? [];
+  
   const filteredCategories = React.useMemo(() => {
-    if (!searchTerm.trim() || !categories) return categories;
-
     const searchLower = searchTerm.toLowerCase();
-    return categories.filter(category =>
+    return categoriesList.filter((category: Category) =>
       category.name.toLowerCase().includes(searchLower) ||
       category.description?.toLowerCase().includes(searchLower)
     );
-  }, [categories, searchTerm]);
+  }, [categoriesList, searchTerm]);  
 
   const handleCategorySelect = (categoryId: string) => {
     router.push({
@@ -187,7 +192,7 @@ export const EnhancedCategoryNavigation: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <SearchIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           </div>
 
           {showFilters && (
@@ -218,4 +223,4 @@ export const EnhancedCategoryNavigation: React.FC = () => {
       </nav>
     </ErrorBoundary>
   );
-}; 
+};

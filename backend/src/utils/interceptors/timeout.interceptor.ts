@@ -14,22 +14,15 @@ export class TimeoutInterceptor implements NestInterceptor {
   private readonly defaultTimeout: number;
 
   constructor(private configService: ConfigService) {
-    this.defaultTimeout = this.configService.get('REQUEST_TIMEOUT', 30000); // Default 30 seconds
+    this.defaultTimeout = this.configService.get('app.requestTimeout', 30000);
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    // Get custom timeout from route metadata if set
-    const handler = context.getHandler();
-    const customTimeout = Reflect.getMetadata('timeout', handler);
-    const timeoutValue = customTimeout || this.defaultTimeout;
-
     return next.handle().pipe(
-      timeout(timeoutValue),
+      timeout(this.defaultTimeout),
       catchError(err => {
         if (err instanceof TimeoutError) {
-          return throwError(() => new RequestTimeoutException(
-            'Request processing timeout. Please try again later.'
-          ));
+          return throwError(() => new RequestTimeoutException('Request timeout'));
         }
         return throwError(() => err);
       }),

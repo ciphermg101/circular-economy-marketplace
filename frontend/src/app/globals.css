@@ -1,8 +1,50 @@
 @import "tailwindcss";
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+
+  .animate-slide-out-right {
+    animation: slide-out-right 0.3s ease-in;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-out-right {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary-color: #0070f3;
+  --secondary-color: #0ea5e9;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
 }
 
 @theme inline {
@@ -16,6 +58,12 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --primary-color: #60a5fa;
+    --secondary-color: #38bdf8;
+    --success-color: #34d399;
+    --error-color: #f87171;
+    --warning-color: #fbbf24;
+    --info-color: #60a5fa;
   }
 }
 

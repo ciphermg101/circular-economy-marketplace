@@ -1,25 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseConfig } from '../../config/supabase.config';
-import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '../../dtos/product.dto';
-import { PaginationParams } from '../../types/common.types';
-import { logger } from '../../utils/logger';
+import { CreateProductDto, UpdateProductDto, SearchProductsDto, Product } from '../../dtos/product.dto';
+import { PaginationParams } from '../../types/pagination.types';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  private readonly supabase;
+  private readonly logger = new Logger(ProductsService.name);
 
-  private get supabase() {
-    return this.supabaseConfig.getClient();
+  constructor(private readonly supabaseConfig: SupabaseConfig) {
+    this.supabase = this.supabaseConfig.getClient();
   }
 
-  async createProduct(userId: string, dto: CreateProductDto) {
+  async create(userId: string, dto: CreateProductDto) {
     try {
       const { data, error } = await this.supabase
         .from('products')
         .insert({
           user_id: userId,
           ...dto,
-          status: 'available',
         })
         .select()
         .single();
@@ -27,64 +27,138 @@ export class ProductsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error creating product:', error);
-      throw error;
+      this.logger.error('Error creating product:', error);
+      throw new InternalServerErrorException('Failed to create product');
     }
   }
 
-  async getProduct(productId: string) {
+  async findAll() {
     try {
       const { data, error } = await this.supabase
         .from('products')
-        .select(`
-          *,
-          user:profiles(*)
-        `)
-        .eq('id', productId)
+        .select('*');
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logger.error('Error finding products:', error);
+      throw new InternalServerErrorException('Failed to find products');
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
         .single();
 
       if (error) throw error;
       if (!data) throw new NotFoundException('Product not found');
-
       return data;
     } catch (error) {
-      logger.error('Error getting product:', error);
-      throw error;
+      this.logger.error('Error finding product:', error);
+      throw new InternalServerErrorException('Failed to find product');
     }
   }
 
-  async updateProduct(userId: string, productId: string, dto: UpdateProductDto) {
+  async update(userId: string, id: string, dto: UpdateProductDto) {
     try {
+      const { data: product } = await this.supabase
+        .from('products')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!product) throw new NotFoundException('Product not found');
+      if (product.user_id !== userId) throw new Error('Not authorized to update this product');
+
       const { data, error } = await this.supabase
         .from('products')
         .update(dto)
-        .eq('id', productId)
-        .eq('user_id', userId) // Ensure user owns the product
+        .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      if (!data) throw new NotFoundException('Product not found or unauthorized');
-
       return data;
     } catch (error) {
-      logger.error('Error updating product:', error);
-      throw error;
+      this.logger.error('Error updating product:', error);
+      throw new InternalServerErrorException('Failed to update product');
     }
   }
 
-  async deleteProduct(userId: string, productId: string) {
+  async remove(userId: string, id: string) {
     try {
+      const { data: product } = await this.supabase
+        .from('products')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!product) throw new NotFoundException('Product not found');
+      if (product.user_id !== userId) throw new Error('Not authorized to delete this product');
+
       const { error } = await this.supabase
         .from('products')
         .delete()
-        .eq('id', productId)
-        .eq('user_id', userId); // Ensure user owns the product
+        .eq('id', id);
 
       if (error) throw error;
+      return { message: 'Product deleted successfully' };
     } catch (error) {
-      logger.error('Error deleting product:', error);
-      throw error;
+      this.logger.error('Error deleting product:', error);
+      throw new InternalServerErrorException('Failed to delete product');
+    }
+  }
+
+  async findNearby(latitude: number, longitude: number, radius: number) {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('find_nearby_products', {
+          lat: latitude,
+          lng: longitude,
+          radius_km: radius
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logger.error('Error finding nearby products:', error);
+      throw new InternalServerErrorException('Failed to find nearby products');
+    }
+  }
+
+  async search(pagination: PaginationParams & { searchTerm?: string }) {
+    try {
+      const { page = 1, limit = 10, searchTerm } = pagination;
+      const offset = (page - 1) * limit;
+
+      let query = this.supabase
+        .from('products')
+        .select('*', { count: 'exact' });
+
+      if (searchTerm) {
+        query = query.textSearch('title', searchTerm);
+      }
+
+      const { data, error, count } = await query
+        .range(offset, offset + limit - 1)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return {
+        items: data,
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      };
+    } catch (error) {
+      this.logger.error('Error searching products:', error);
+      throw new InternalServerErrorException('Failed to search products');
     }
   }
 
@@ -120,11 +194,17 @@ export class ProductsService {
 
       // Location-based search
       if (searchDto.location && searchDto.radius) {
-        query = query.rpc('nearby_products', {
-          lat: searchDto.location.latitude,
-          lng: searchDto.location.longitude,
-          radius_km: searchDto.radius,
-        });
+        const nearbyProducts = await this.supabase
+          .rpc('find_nearby_products', {
+            lat: searchDto.location.latitude,
+            lng: searchDto.location.longitude,
+            radius_km: searchDto.radius
+          });
+
+        if (nearbyProducts.error) throw nearbyProducts.error;
+        
+        // Filter the query by the found product IDs
+        query = query.in('id', nearbyProducts.data.map((p: Product) => p.id));
       }
 
       // Apply pagination
@@ -141,7 +221,7 @@ export class ProductsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error searching products:', error);
+      this.logger.error('Error searching products:', error);
       throw error;
     }
   }
@@ -162,7 +242,7 @@ export class ProductsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error getting user products:', error);
+      this.logger.error('Error getting user products:', error);
       throw error;
     }
   }
@@ -222,19 +302,5 @@ export class ProductsService {
         totalPages: Math.ceil((count ?? 0) / limit),
       },
     };
-  }
-
-  async findNearbyProducts(latitude: number, longitude: number, radius: number) {
-    const { data, error } = await this.supabase
-      .from('products')
-      .select('*')
-      .filter('location', 'not.is.null')
-      .filter('location', 'st_dwithin', `POINT(${longitude} ${latitude})`, radius * 1000);
-
-    if (error) {
-      throw new Error(`Error finding nearby products: ${error.message}`);
-    }
-
-    return data;
   }
 } 

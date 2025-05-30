@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
-import { useToast } from '../../contexts/ToastContext'
+import { useToast } from '../../contexts/ToastProvider'
 
 export function LoginForm() {
   const [email, setEmail] = useState('')

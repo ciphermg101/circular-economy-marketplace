@@ -5,14 +5,14 @@ import { useSession } from 'next-auth/react';
 import {
   UserCircleIcon,
   PaperAirplaneIcon,
-  SearchIcon,
-  EmojiHappyIcon,
+  MagnifyingGlassIcon,
+  FaceSmileIcon, 
   PaperClipIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { ErrorBoundary } from './ErrorBoundary';
 import { LoadingSpinner } from './LoadingSpinner';
-import { showToast } from './Toast';
+import { useToast } from '../../contexts/ToastProvider';
 import { useWebSocket } from '@/lib/websocket';
 
 interface Conversation {
@@ -33,6 +33,8 @@ interface Message {
   created_at: string;
   attachments?: string[];
 }
+
+const { showToast } = useToast();
 
 const fetchConversations = async (): Promise<Conversation[]> => {
   const response = await fetch('/api/messages/conversations');
@@ -159,7 +161,7 @@ export const EnhancedMessaging: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <SearchIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
           </div>
 
@@ -282,7 +284,7 @@ export const EnhancedMessaging: React.FC = () => {
                     onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
                     className="p-2 text-gray-500 hover:text-gray-700"
                   >
-                    <EmojiHappyIcon className="h-6 w-6" />
+                    <FaceSmileIcon className="h-6 w-6" />
                   </button>
 
                   <button

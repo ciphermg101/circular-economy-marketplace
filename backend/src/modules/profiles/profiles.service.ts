@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseConfig } from '../../config/supabase.config';
 import { CreateProfileDto, UpdateProfileDto, VerifyProfileDto } from '../../dtos/profile.dto';
-import { logger } from '../../utils/logger';
+import { PinoLogger } from '../../utils/logger'; // <-- Import the actual logger class
 
 @Injectable()
 export class ProfilesService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly logger: PinoLogger, // <-- Inject logger here
+  ) {}
 
   private get supabase() {
     return this.supabaseConfig.getClient();
@@ -35,7 +38,7 @@ export class ProfilesService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error creating profile:', error);
+      this.logger.error('Error creating profile', error?.stack); // <-- Correct usage
       throw error;
     }
   }
@@ -53,7 +56,7 @@ export class ProfilesService {
 
       return data;
     } catch (error) {
-      logger.error('Error getting profile:', error);
+      this.logger.error('Error getting profile', error?.stack);
       throw error;
     }
   }
@@ -85,7 +88,7 @@ export class ProfilesService {
 
       return data;
     } catch (error) {
-      logger.error('Error updating profile:', error);
+      this.logger.error('Error updating profile', error?.stack);
       throw error;
     }
   }
@@ -106,7 +109,7 @@ export class ProfilesService {
 
       return data;
     } catch (error) {
-      logger.error('Error verifying profile:', error);
+      this.logger.error('Error verifying profile', error?.stack);
       throw error;
     }
   }
@@ -122,7 +125,7 @@ export class ProfilesService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error searching profiles:', error);
+      this.logger.error('Error searching profiles', error?.stack);
       throw error;
     }
   }
@@ -138,8 +141,8 @@ export class ProfilesService {
       if (error) throw error;
       return data;
     } catch (error) {
-      logger.error('Error getting profiles by type:', error);
+      this.logger.error('Error getting profiles by type', error?.stack);
       throw error;
     }
   }
-} 
+}

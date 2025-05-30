@@ -73,7 +73,7 @@ export function PopularRepairShops() {
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-500">{shop.specialty}</p>
-          <p className="mt-1 text-sm text-gray-500">{shop.location}</p>
+          <p className="mt-1 text-sm text-gray-500">{shop.location?.address}</p>
         </Link>
       ))}
     </div>
