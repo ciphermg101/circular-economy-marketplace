@@ -2,51 +2,51 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   Request,
   UseGuards,
-  Patch,
+  UseInterceptors,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { ProductsService } from './products.service';
-import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '../../dtos/product.dto';
-import { PaginationParams } from '../../types/pagination.types';
-import { AuthenticatedRequest } from '../../types/request.types';
-import { RolesGuard } from '../../guards/roles.guard';
-import { Roles } from '../../decorators/roles.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '../../guards/auth.guard';
+import { ProductsService } from '@products/products.service';
+import { CreateProductDto } from '@products/dto/create-product.dto';
+import { UpdateProductDto } from '@products/dto/update-product.dto';
+import { SearchProductsDto } from '@products/dto/search-product.dto';
+import { PaginationParams } from '@products/interface/pagination.types';
+import { TransformResponseInterceptor } from '@common/interceptors/transform-response.interceptor';
 
 @ApiTags('products')
+@UseInterceptors(TransformResponseInterceptor)
 @Controller('products')
-@UseGuards(AuthGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @Roles('seller')
+  // @Roles('seller')
   @ApiOperation({ summary: 'Create a new product' })
   @ApiBearerAuth()
-  async create(@Request() req: AuthenticatedRequest, @Body() dto: CreateProductDto) {
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async create(
+    @Request() req: any,
+    @Body() dto: CreateProductDto
+  ) {
     return this.productsService.create(req.user.id, dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Search products' })
-  async findAll(@Query() pagination: PaginationParams) {
-    return this.productsService.search(pagination);
-  }
-
-  @Get('nearby')
-  async findNearby(
-    @Query('latitude') latitude: number,
-    @Query('longitude') longitude: number,
-    @Query('radius') radius: number = 10,
+  @ApiOperation({ summary: 'Search and list products' })
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async findAll(
+    @Query() searchDto: SearchProductsDto,
+    @Query() pagination: PaginationParams
   ) {
-    return this.productsService.findNearby(latitude, longitude, radius);
+    return this.productsService.searchProducts(searchDto, pagination);
   }
 
   @Get(':id')
@@ -56,11 +56,12 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @Roles('seller')
+  // @Roles('seller')
   @ApiOperation({ summary: 'Update a product' })
   @ApiBearerAuth()
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async update(
-    @Request() req: AuthenticatedRequest,
+    @Request() req: any,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
@@ -68,30 +69,10 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @Roles('seller')
+  // @Roles('seller')
   @ApiOperation({ summary: 'Delete a product' })
   @ApiBearerAuth()
-  async remove(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+  async remove(@Request() req: any, @Param('id') id: string) {
     return this.productsService.remove(req.user.id, id);
   }
-
-  @Get('seller/:id')
-  @ApiOperation({ summary: 'Get products by seller ID' })
-  async getSellerProducts(
-    @Param('id') sellerId: string,
-    @Query() pagination: PaginationParams,
-  ) {
-    return this.productsService.getSellerProducts(sellerId, pagination);
-  }
-
-  @Get('my/products')
-  @Roles('seller')
-  @ApiOperation({ summary: 'Get current user products' })
-  @ApiBearerAuth()
-  async getMyProducts(
-    @Request() req: AuthenticatedRequest,
-    @Query() pagination: PaginationParams,
-  ) {
-    return this.productsService.getSellerProducts(req.user.id, pagination);
-  }
-} 
+}

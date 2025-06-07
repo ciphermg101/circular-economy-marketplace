@@ -1,15 +1,15 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { User } from '../profiles/user.entity';
-import { Review } from './review.entity';
+import { User } from '@users/user.entity';
+import { Review } from '@products/review.entity';
+import { BaseEntity } from '@common/entities/base.entity';
+import { IsString, IsNumber, IsEnum, IsOptional, IsArray, IsObject, IsUUID } from 'class-validator';
+import { ProductCategory } from '@products/product-category.entity';
 
 export enum ProductCondition {
   NEW = 'new',
@@ -19,20 +19,28 @@ export enum ProductCondition {
   POOR = 'poor',
 }
 
-@Entity('products')
-export class Product {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export enum ProductStatus {
+  ACTIVE = 'active',
+  SOLD = 'sold',
+  RESERVED = 'reserved',
+  INACTIVE = 'inactive',
+}
 
+@Entity('products')
+export class Product extends BaseEntity {
+  @IsString()
   @Column()
   title: string;
 
+  @IsString()
   @Column('text')
   description: string;
 
+  @IsNumber()
   @Column('decimal', { precision: 10, scale: 2 })
   price: number;
 
+  @IsEnum(ProductCondition)
   @Column({
     type: 'enum',
     enum: ProductCondition,
@@ -40,40 +48,49 @@ export class Product {
   })
   condition: ProductCondition;
 
-  @Column()
-  category: string;
+  @ManyToOne(() => ProductCategory, { eager: true })
+  @JoinColumn({ name: 'category_id' })
+  category: ProductCategory;
 
+  @IsUUID()
+  @Column({ name: 'category_id' })
+  categoryId: string;
+
+  @IsOptional()
+  @IsObject()
   @Column('jsonb', { nullable: true })
-  metadata: Record<string, any>;
+  metadata?: Record<string, any>;
 
+  @IsArray()
+  @IsString({ each: true })
   @Column('text', { array: true, default: [] })
   images: string[];
 
+  @IsOptional()
+  @IsObject()
   @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: true })
-  location: { type: string; coordinates: [number, number] };
+  location?: { type: string; coordinates: [number, number] };
 
-  @Column({ default: 'active' })
-  status: string;
+  @IsEnum(ProductStatus)
+  @Column({ type: 'enum', enum: ProductStatus, default: ProductStatus.ACTIVE })
+  status: ProductStatus;
 
   @ManyToOne(() => User, user => user.products)
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  @IsUUID()
   @Column({ name: 'user_id' })
   userId: string;
 
   @OneToMany(() => Review, review => review.product)
   reviews: Review[];
 
+  @IsNumber()
   @Column({ type: 'decimal', precision: 2, scale: 1, default: 0 })
   rating: number;
 
+  @IsNumber()
   @Column({ type: 'integer', default: 0 })
   reviewCount: number;
-
-  @CreateDateColumn({ type: 'timestamptz' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ type: 'timestamptz' })
-  updatedAt: Date;
 }

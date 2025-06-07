@@ -1,25 +1,13 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { SupabaseModule } from '../supabase/supabase.module';
+import { AuthService } from '@auth/auth.service';
+import { AuthController } from '@auth/auth.controller';
+import { AuthRepository } from '@auth/auth.repository';
+import { SupabaseModule } from '@common/supabase/supabase.module';
+import { UsersModule } from '@users/users.module';
 
 @Module({
-  imports: [
-    ConfigModule,
-    SupabaseModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: '30d' },
-      }),
-      inject: [ConfigService],
-    }),
-  ],
-  controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService],
+  imports: [SupabaseModule, UsersModule],
+  providers: [AuthService, AuthRepository],
+  controllers: [AuthController]
 })
-export class AuthModule {} 
+export class AuthModule {}

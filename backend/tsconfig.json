@@ -16,6 +16,16 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
     "strictBindCallApply": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@common/*": ["src/common/*"],
+      "@auth/*": ["src/modules/auth/*"],
+      "@supabase/*": ["src/common/supabase/*"],
+      "@users/*": ["src/modules/users/*"],
+      "@products/*": ["src/modules/products/*"],
+      "@transactions/*": ["src/modules/transactions/*"],
+      "@repair-shops/*": ["src/modules/repair-shops/*"],
+    }
   }
 }

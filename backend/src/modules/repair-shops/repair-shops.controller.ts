@@ -7,39 +7,49 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   Request,
+  UseInterceptors,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { RepairShopsService } from './repair-shops.service';
-import { CreateRepairShopDto, UpdateRepairShopDto, SearchRepairShopsDto } from '../../dtos/repair-shop.dto';
-import { PaginationParams } from '../../types/common.types';
-import { AuthGuard } from '../../guards/auth.guard';
-import { RolesGuard } from '../../guards/roles.guard';
-import { Roles } from '../../decorators/roles.decorator';
+import { RepairShopsService } from '@repair-shops/repair-shops.service';
+import { CreateRepairShopDto } from '@repair-shops/dto/create-shop.dto';
+import { UpdateRepairShopDto } from '@repair-shops/dto/update-shop.dto';
+import { BookingDto } from '@repair-shops/dto/booking.dto';
+import { ReviewDto } from '@repair-shops/dto/review.dto';
+import { SearchRepairShopsDto } from '@repair-shops/dto/search-shop.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthenticatedRequest } from '../../types/request.types';
+import { TransformResponseInterceptor } from '@common/interceptors/transform-response.interceptor';
+// import { AuthGuard } from '../../guards/auth.guard';
+// import { RolesGuard } from '../../guards/roles.guard';
+// import { Roles } from '../../decorators/roles.decorator';
+// import { AuthenticatedRequest } from '../../types/request.types';
 
 @ApiTags('repair-shops')
+@UseInterceptors(TransformResponseInterceptor)
 @Controller('repair-shops')
-@UseGuards(AuthGuard)
 export class RepairShopsController {
   constructor(private readonly repairShopsService: RepairShopsService) {}
 
   @Post()
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('repair_shop')
+  // @UseGuards(AuthGuard, RolesGuard)
+  // @Roles('repair_shop')
   @ApiOperation({ summary: 'Create a new repair shop' })
   @ApiBearerAuth()
-  async createRepairShop(@Request() req: AuthenticatedRequest, @Body() dto: CreateRepairShopDto) {
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async createRepairShop(
+    @Request() req: any, // Replace with AuthenticatedRequest when available
+    @Body() dto: CreateRepairShopDto
+  ) {
     return this.repairShopsService.create(req.user.id, dto);
   }
 
   @Get('my-shop')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('repair_shop')
+  // @UseGuards(AuthGuard, RolesGuard)
+  // @Roles('repair_shop')
   @ApiOperation({ summary: 'Get current user repair shop' })
   @ApiBearerAuth()
-  async getMyShop(@Request() req: AuthenticatedRequest) {
+  async getMyShop(@Request() req: any) {
     return this.repairShopsService.findByUserId(req.user.id);
   }
 
@@ -50,12 +60,13 @@ export class RepairShopsController {
   }
 
   @Put(':id')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('repair_shop')
+  // @UseGuards(AuthGuard, RolesGuard)
+  // @Roles('repair_shop')
   @ApiOperation({ summary: 'Update a repair shop' })
   @ApiBearerAuth()
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async updateRepairShop(
-    @Request() req: AuthenticatedRequest,
+    @Request() req: any,
     @Param('id') id: string,
     @Body() dto: UpdateRepairShopDto,
   ) {
@@ -63,29 +74,44 @@ export class RepairShopsController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('repair_shop')
+  // @UseGuards(AuthGuard, RolesGuard)
+  // @Roles('repair_shop')
   @ApiOperation({ summary: 'Delete a repair shop' })
   @ApiBearerAuth()
-  async deleteRepairShop(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+  async deleteRepairShop(@Request() req: any, @Param('id') id: string) {
     return this.repairShopsService.remove(req.user.id, id);
   }
 
   @Get()
   @ApiOperation({ summary: 'Search repair shops' })
+  @UsePipes(new ValidationPipe({ transform: true }))
   async searchRepairShops(
-    @Query() searchDto: SearchRepairShopsDto,
-    @Query() pagination: PaginationParams,
+    @Query() searchDto: SearchRepairShopsDto
   ) {
-    return this.repairShopsService.searchRepairShops(searchDto, pagination);
+    return this.repairShopsService.searchRepairShops(searchDto);
   }
 
-  @Get('service/:service')
-  @ApiOperation({ summary: 'Get repair shops by service' })
-  async getShopsByService(
-    @Param('service') service: string,
-    @Query() pagination: PaginationParams,
+  @Post(':id/bookings')
+  @ApiOperation({ summary: 'Create a booking for a repair shop' })
+  @ApiBearerAuth()
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async createBooking(
+    @Request() req: any,
+    @Param('id') repairShopId: string,
+    @Body() dto: BookingDto
   ) {
-    return this.repairShopsService.getShopsByService(service, pagination);
+    return this.repairShopsService.createBooking(req.user.id, { ...dto, repairShopId });
+  }
+
+  @Post(':id/reviews')
+  @ApiOperation({ summary: 'Create a review for a repair shop' })
+  @ApiBearerAuth()
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async createReview(
+    @Request() req: any,
+    @Param('id') repairShopId: string,
+    @Body() dto: ReviewDto
+  ) {
+    return this.repairShopsService.createReview(req.user.id, { ...dto, repairShopId });
   }
 } 

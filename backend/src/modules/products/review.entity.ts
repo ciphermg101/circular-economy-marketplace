@@ -9,8 +9,8 @@ import {
   Check,
   Index,
 } from 'typeorm';
-import { Product } from './product.entity';
-import { User } from '../profiles/user.entity';
+import { Product } from '@products/product.entity';
+import { User } from '@users/user.entity';
 import { IsInt, Min, Max, IsString, Length, IsOptional, IsBoolean, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 

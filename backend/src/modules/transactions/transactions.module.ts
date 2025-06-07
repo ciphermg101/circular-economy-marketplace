@@ -1,22 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { TransactionsService } from './transactions.service';
-import { TransactionsController } from './transactions.controller';
-import { MpesaModule } from '../mpesa/mpesa.module';
-import { MonitoringModule } from '../monitoring/monitoring.module';
-import { SupabaseModule } from '../supabase/supabase.module';
-import { WebsocketModule } from '../websocket/websocket.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Transaction } from '@transactions/transaction.entity';
+import { Offer } from '@transactions/offer.entity';
+import { TransactionsRepository } from '@transactions/transactions.repository';
+import { TransactionsService } from '@transactions/transactions.service';
+import { TransactionsController } from '@transactions/transactions.controller';
 
 @Module({
-  imports: [
-    ConfigModule,
-    MpesaModule,
-    MonitoringModule,
-    SupabaseModule,
-    WebsocketModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Transaction, Offer])],
   controllers: [TransactionsController],
-  providers: [TransactionsService],
-  exports: [TransactionsService],
+  providers: [TransactionsRepository, TransactionsService],
+  exports: [TransactionsService, TransactionsRepository],
 })
 export class TransactionsModule {} 

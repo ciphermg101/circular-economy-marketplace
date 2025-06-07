@@ -1,31 +1,26 @@
-import { IsString, IsEmail, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsEmail, IsNotEmpty, IsStrongPassword } from "class-validator";
 
-export class SignInDto {
-  @ApiProperty()
+export class AuthCredentialsDto {
+  @ApiProperty({
+    example: "user@gmail.com",
+    description: "The email address of the user",
+  })
+  @IsNotEmpty()
   @IsEmail()
   email: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty()
-  @IsString()
-  provider: string;
-
-  @ApiProperty()
-  @IsString()
-  providerAccountId: string;
+  @ApiProperty({
+    example: "Password@123",
+    description: "The password for the user account",
+  })
+  @IsNotEmpty()
+  @IsStrongPassword({
+    minLength: 8,
+    minLowercase: 1,
+    minUppercase: 1,
+    minNumbers: 1,
+    minSymbols: 1,
+  })
+  password: string;
 }
-
-export class TokenDto {
-  @ApiProperty()
-  @IsString()
-  userId: string;
-
-  @ApiProperty()
-  @IsString()
-  provider: string;
-} 
