@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { plainToInstance} from 'class-transformer';
 import {validateSync} from 'class-validator';
-import { AppConfigDto, CorsConfigDto, EmailConfigDto, RedisConfigDto, SentryConfigDto, SupabaseConfigDto } from '@common/configs/dto/config.dto';
+import { AppConfigDto, CorsConfigDto, EmailConfigDto, RedisConfigDto, SentryConfigDto, SupabaseConfigDto, DatabaseConfigDto } from '@common/configs/dto/config.dto';
 
 function validateConfig<T extends object>(cls: new () => T, config: Record<string, any>): T {
   const instance = plainToInstance(cls, config, { enableImplicitConversion: true });
@@ -33,7 +33,7 @@ export const corsConfig = registerAs('cors', () =>
 export const supabaseConfig = registerAs('supabase', () =>
   validateConfig(SupabaseConfigDto, {
     url: process.env.SUPABASE_URL ?? '',
-    anon_key: process.env.SUPABASE_ANON_KEY ?? '',
+    anonKey: process.env.SUPABASE_ANON_KEY ?? '',
   })
 );
 
@@ -56,5 +56,11 @@ export const redisConfig = registerAs('redis', () =>
 export const sentryConfig = registerAs('monitoring', () =>
   validateConfig(SentryConfigDto, {
     sentryDsn: process.env.SENTRY_DSN ?? '',
+  })
+);
+
+export const databaseConfig = registerAs('database', () =>
+  validateConfig(DatabaseConfigDto, {
+    url: process.env.DATABASE_URL ?? '',
   })
 );

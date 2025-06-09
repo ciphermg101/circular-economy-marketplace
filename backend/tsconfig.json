@@ -26,6 +26,7 @@
       "@products/*": ["src/modules/products/*"],
       "@transactions/*": ["src/modules/transactions/*"],
       "@repair-shops/*": ["src/modules/repair-shops/*"],
+      "@messaging/*": ["src/modules/messaging/*"],
     }
   }
 }

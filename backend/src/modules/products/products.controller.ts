@@ -15,11 +15,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from '@products/products.service';
-import { CreateProductDto } from '@products/dto/create-product.dto';
-import { UpdateProductDto } from '@products/dto/update-product.dto';
-import { SearchProductsDto } from '@products/dto/search-product.dto';
+import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '@products/dto/product.dto';
 import { PaginationParams } from '@products/interface/pagination.types';
 import { TransformResponseInterceptor } from '@common/interceptors/transform-response.interceptor';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { RolesGuard } from '@/common/guards/roles.guard';
+import { AuthGuard } from '@/common/guards/auth.guard';
 
 @ApiTags('products')
 @UseInterceptors(TransformResponseInterceptor)
@@ -28,7 +29,8 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  // @Roles('seller')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('seller')
   @ApiOperation({ summary: 'Create a new product' })
   @ApiBearerAuth()
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -56,7 +58,8 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  // @Roles('seller')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('seller')
   @ApiOperation({ summary: 'Update a product' })
   @ApiBearerAuth()
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -69,7 +72,8 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  // @Roles('seller')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('seller')
   @ApiOperation({ summary: 'Delete a product' })
   @ApiBearerAuth()
   async remove(@Request() req: any, @Param('id') id: string) {

@@ -29,7 +29,7 @@ export enum ProductStatus {
 @Entity('products')
 export class Product extends BaseEntity {
   @IsString()
-  @Column()
+  @Column({ type: 'varchar' })
   title: string;
 
   @IsString()
@@ -53,7 +53,7 @@ export class Product extends BaseEntity {
   category: ProductCategory;
 
   @IsUUID()
-  @Column({ name: 'category_id' })
+  @Column({ type: 'uuid', name: 'category_id' })
   categoryId: string;
 
   @IsOptional()
@@ -80,7 +80,7 @@ export class Product extends BaseEntity {
   user: User;
 
   @IsUUID()
-  @Column({ name: 'user_id' })
+  @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
   @OneToMany(() => Review, review => review.product)

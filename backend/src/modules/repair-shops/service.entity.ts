@@ -7,7 +7,7 @@ import { IsString, IsOptional, IsNumber, IsUUID } from 'class-validator';
 @Entity('services')
 export class Service extends BaseEntity {
   @IsUUID()
-  @Column({ name: 'repair_shop_id' })
+  @Column({ type: 'uuid', name: 'repair_shop_id' })
   repairShopId: string;
 
   @ManyToOne(() => RepairShop, shop => shop.services)
@@ -15,7 +15,7 @@ export class Service extends BaseEntity {
   repairShop: RepairShop;
 
   @IsString()
-  @Column()
+  @Column({ type: 'varchar' })
   name: string;
 
   @IsOptional()
@@ -28,7 +28,7 @@ export class Service extends BaseEntity {
   price: number;
 
   @IsString()
-  @Column()
+  @Column({ type: 'varchar' })
   category: string;
 
   @OneToMany(() => Booking, booking => booking.service)

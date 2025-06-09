@@ -40,7 +40,7 @@ export class Review {
   @ApiProperty({ description: 'Product being reviewed' })
   product: Product;
 
-  @Column({ name: 'product_id' })
+  @Column({ type: 'uuid', name: 'product_id' })
   @ApiProperty({ description: 'ID of the product being reviewed' })
   productId: string;
 
@@ -49,7 +49,7 @@ export class Review {
   @ApiProperty({ description: 'User who wrote the review' })
   user: User;
 
-  @Column({ name: 'user_id' })
+  @Column({ type: 'uuid', name: 'user_id' })
   @ApiProperty({ description: 'ID of the user who wrote the review' })
   userId: string;
 

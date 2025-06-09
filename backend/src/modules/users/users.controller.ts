@@ -12,9 +12,9 @@ import {
 } from '@nestjs/common';
 import { UsersService } from '@users/users.service';
 import { CreateProfileDto, UpdateProfileDto, VerifyProfileDto } from '@users/dto/user.dto';
-import { AuthGuard } from '@/modules/auth/guards/auth.guard';
-import { RolesGuard } from '@/modules/auth/guards/roles.guard';
-import { Roles } from '@/modules/auth/decorators/roles.decorator';
+import { AuthGuard } from '@/common/guards/auth.guard';
+import { RolesGuard } from '@/common/guards/roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('users')
@@ -85,4 +85,4 @@ export class UsersController {
   async getUsersByType(@Param('type') type: string) {
     return this.usersService.getUsersByType(type);
   }
-} 
+}

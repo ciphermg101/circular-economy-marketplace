@@ -44,7 +44,7 @@ export class SupabaseConfigDto {
   url!: string;
 
   @IsString()
-  anon_key!: string;
+  anonKey!: string;
 }
 
 export class EmailConfigDto {
@@ -92,4 +92,9 @@ export class RedisConfigDto {
 export class SentryConfigDto {
   @IsString()
   sentryDsn!: string;
+}
+
+export class DatabaseConfigDto {
+  @IsString()
+  url!: string;
 }

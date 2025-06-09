@@ -15,7 +15,7 @@ export enum BookingStatus {
 @Entity('bookings')
 export class Booking extends BaseEntity {
   @IsUUID()
-  @Column({ name: 'repair_shop_id' })
+  @Column({ type: 'uuid', name: 'repair_shop_id' })
   repairShopId: string;
 
   @ManyToOne(() => RepairShop, shop => shop.bookings)
@@ -23,7 +23,7 @@ export class Booking extends BaseEntity {
   repairShop: RepairShop;
 
   @IsUUID()
-  @Column({ name: 'service_id' })
+  @Column({ type: 'uuid', name: 'service_id' })
   serviceId: string;
 
   @ManyToOne(() => Service, service => service.bookings)
@@ -31,7 +31,7 @@ export class Booking extends BaseEntity {
   service: Service;
 
   @IsUUID()
-  @Column({ name: 'user_id' })
+  @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
   @ManyToOne(() => User)

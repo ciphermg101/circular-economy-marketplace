@@ -7,9 +7,13 @@ import { RepairShop } from '@repair-shops/repair-shop.entity';
 import { Service } from '@repair-shops/service.entity';
 import { Booking } from '@repair-shops/booking.entity';
 import { Review } from '@repair-shops/review.entity';
+import { SupabaseModule } from '@common/supabase/supabase.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RepairShop, Service, Booking, Review])],
+  imports: [
+    TypeOrmModule.forFeature([RepairShop, Service, Booking, Review]),
+    SupabaseModule
+  ],
   controllers: [RepairShopsController],
   providers: [RepairShopsService, RepairShopsRepository],
   exports: [RepairShopsService, RepairShopsRepository],

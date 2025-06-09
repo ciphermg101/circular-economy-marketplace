@@ -1,8 +1,6 @@
 import { Injectable, InternalServerErrorException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ProductsRepository } from '@products/products.repository';
-import { CreateProductDto } from '@products/dto/create-product.dto';
-import { UpdateProductDto } from '@products/dto/update-product.dto';
-import { SearchProductsDto } from '@products/dto/search-product.dto';
+import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '@products/dto/product.dto';
 import { PaginationParams } from '@products/interface/pagination.types';
 
 @Injectable()

@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UsePipes,
   ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { RepairShopsService } from '@repair-shops/repair-shops.service';
 import { CreateRepairShopDto } from '@repair-shops/dto/create-shop.dto';
@@ -20,9 +21,9 @@ import { ReviewDto } from '@repair-shops/dto/review.dto';
 import { SearchRepairShopsDto } from '@repair-shops/dto/search-shop.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TransformResponseInterceptor } from '@common/interceptors/transform-response.interceptor';
-// import { AuthGuard } from '../../guards/auth.guard';
-// import { RolesGuard } from '../../guards/roles.guard';
-// import { Roles } from '../../decorators/roles.decorator';
+import { AuthGuard } from '@/common/guards/auth.guard';
+import { RolesGuard } from '@/common/guards/roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
 // import { AuthenticatedRequest } from '../../types/request.types';
 
 @ApiTags('repair-shops')
@@ -32,8 +33,8 @@ export class RepairShopsController {
   constructor(private readonly repairShopsService: RepairShopsService) {}
 
   @Post()
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles('repair_shop')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('repair_shop')
   @ApiOperation({ summary: 'Create a new repair shop' })
   @ApiBearerAuth()
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -45,8 +46,8 @@ export class RepairShopsController {
   }
 
   @Get('my-shop')
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles('repair_shop')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('repair_shop')
   @ApiOperation({ summary: 'Get current user repair shop' })
   @ApiBearerAuth()
   async getMyShop(@Request() req: any) {
@@ -60,8 +61,8 @@ export class RepairShopsController {
   }
 
   @Put(':id')
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles('repair_shop')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('repair_shop')
   @ApiOperation({ summary: 'Update a repair shop' })
   @ApiBearerAuth()
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -74,8 +75,8 @@ export class RepairShopsController {
   }
 
   @Delete(':id')
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles('repair_shop')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('repair_shop')
   @ApiOperation({ summary: 'Delete a repair shop' })
   @ApiBearerAuth()
   async deleteRepairShop(@Request() req: any, @Param('id') id: string) {
@@ -114,4 +115,4 @@ export class RepairShopsController {
   ) {
     return this.repairShopsService.createReview(req.user.id, { ...dto, repairShopId });
   }
-} 
+}

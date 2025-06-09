@@ -6,12 +6,12 @@ import { IsString, IsOptional } from 'class-validator';
 @Entity('product_categories')
 export class ProductCategory extends BaseEntity {
   @IsString()
-  @Column({ unique: true })
+  @Column({ type: 'varchar', unique: true })
   name: string;
 
   @IsOptional()
   @IsString()
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   description?: string;
 
   @OneToMany(() => Product, product => product.category)

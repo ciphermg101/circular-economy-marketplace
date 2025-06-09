@@ -15,7 +15,7 @@ export enum OfferStatus {
 @Entity('offers')
 export class Offer extends BaseEntity {
   @IsUUID()
-  @Column({ name: 'transaction_id', nullable: true })
+  @Column({ type: 'uuid', name: 'transaction_id', nullable: true })
   transactionId?: string;
 
   @ManyToOne(() => Transaction, { nullable: true })
@@ -23,7 +23,7 @@ export class Offer extends BaseEntity {
   transaction?: Transaction;
 
   @IsUUID()
-  @Column({ name: 'buyer_id' })
+  @Column({ type: 'uuid', name: 'buyer_id' })
   buyerId: string;
 
   @ManyToOne(() => User)
@@ -31,7 +31,7 @@ export class Offer extends BaseEntity {
   buyer: User;
 
   @IsUUID()
-  @Column({ name: 'seller_id' })
+  @Column({ type: 'uuid', name: 'seller_id' })
   sellerId: string;
 
   @ManyToOne(() => User)
@@ -39,7 +39,7 @@ export class Offer extends BaseEntity {
   seller: User;
 
   @IsUUID()
-  @Column({ name: 'product_id' })
+  @Column({ type: 'uuid', name: 'product_id' })
   productId: string;
 
   @ManyToOne(() => Product)

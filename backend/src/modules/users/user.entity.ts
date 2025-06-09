@@ -16,7 +16,7 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ type: 'varchar', unique: true })
   email: string;
 
   @Column({
@@ -26,19 +26,19 @@ export class User {
   })
   role: UserRole;
 
-  @Column({ unique: true, nullable: true })
-  username: string | null;
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  username: string;
 
-  @Column({ name: 'full_name', nullable: true })
+  @Column({ type: 'varchar', name: 'full_name', nullable: true })
   fullName: string | null;
 
-  @Column({ name: 'avatar_url', nullable: true })
+  @Column({ type: 'varchar', name: 'avatar_url', nullable: true })
   avatarUrl: string | null;
 
-  @Column({ name: 'phone_number', nullable: true })
+  @Column({ type: 'varchar', name: 'phone_number', nullable: true })
   phoneNumber: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   address: string | null;
 
   @Column({ name: 'is_verified', default: false })

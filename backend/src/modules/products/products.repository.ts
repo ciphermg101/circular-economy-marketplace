@@ -3,9 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, FindOptionsWhere, MoreThanOrEqual, LessThanOrEqual, Between } from 'typeorm';
 import { Product } from '@products/product.entity';
 import { ProductCategory } from '@products/product-category.entity';
-import { CreateProductDto } from '@products/dto/create-product.dto';
-import { UpdateProductDto } from '@products/dto/update-product.dto';
-import { SearchProductsDto } from '@products/dto/search-product.dto';
+import { CreateProductDto, UpdateProductDto, SearchProductsDto } from '@products/dto/product.dto';
 import { PaginationParams } from '@products/interface/pagination.types';
 
 export interface IProductsRepository {
